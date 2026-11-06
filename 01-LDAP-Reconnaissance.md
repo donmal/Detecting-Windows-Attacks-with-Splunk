@@ -78,6 +78,11 @@ net group "Domain Admins" /domain
 
 This command queries Active Directory for members of the Domain Admins group, providing attackers with a list of high-value privileged accounts.
 
+## Screenshot Placeholder 
+
+Caption: 
+
+Figure 1 - Native Windows command used to enumerate Domain Admins.
 
 ## BloodHound and SharpHound Reconnaissance
 
@@ -129,6 +134,18 @@ This collects a broad set of domain information, including:
 •	Object properties
 
 •	Local administrators
+
+## Screenshot Placeholder
+
+Caption:
+
+Figure 2 - BloodHound graph showing Active Directory relationships and attack paths.
+
+## Screenshot Placeholder 
+
+Caption:
+
+Figure 3 - SharpHound executed with all collection methods.
 
 ## Why LDAP Matters
 
@@ -291,9 +308,13 @@ rundll32.exe is a legitimate Windows binary used to execute functions exported f
 Attackers frequently abuse it because it is:
 
 •	Native to Windows
+
 •	Microsoft-signed
+
 •	Common in enterprise environments
+
 •	Often trusted by security controls
+
 •	Useful for proxy execution
 
 Seeing rundll32 associated with LDAP reconnaissance is suspicious because it suggests LDAP enumeration may have been performed through a proxy execution technique rather than a normal administrative tool.
