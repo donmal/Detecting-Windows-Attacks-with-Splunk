@@ -1,10 +1,12 @@
 # Detecting Windows Attacks with Splunk - Active Directory Threat Hunting & Detection Portfolio
+Write-up of Hack The Box Academy labs. Practice work.
 
 ## Overview
 
 This repository contains a practical threat hunting and detection engineering portfolio focused on Active Directory attack detection using Splunk, Windows Security Events, Sysmon telemetry, and MITRE ATT&CK.
 
-The project documents complete investigation workflows for some of the most common Active Directory attack techniques used by adversaries during post-exploitation, credential abuse, privilege escalation, persistence, and lateral movement.
+The project documents investigation workflows developed through hands-on lab exercises covering common Active Directory attack techniques associated with credential abuse, privilege escalation, persistence, and lateral movement.
+
 Rather than presenting isolated detection rules, each investigation follows a structured SOC investigation methodology that includes:
 
 - Attack background
@@ -162,18 +164,18 @@ Each investigation follows a consistent workflow:
 5. Data Sources
 6. Investigation Scope
 7. Investigation Methodology
-8. Challenge Context
-9. Investigation Overview
-10. Investigation Queries
-11. Investigation Findings
-12. Investigation Workflow
-13. Detection Logic
-14. IOC Summary
-15. MITRE ATT&CK Mapping
-16. Lessons Learned
-17. Conclusion
+8. Investigation Overview
+9. Investigation Queries
+10. Investigation Findings
+11. Investigation Workflow
+12. Detection Logic
+13. IOC Summary
+14. MITRE ATT&CK Mapping
+15. Lessons Learned
+16. Conclusion
 
-This standardized structure reflects a real-world Security Operations Center (SOC) investigation process rather than isolated lab exercises.
+This standardized structure applies SOC investigation principles to controlled lab environments, emphasizing evidence-based analysis, reproducible detection queries, and documented investigation findings.
+
 ---
 # Detection Engineering Focus
 
@@ -216,7 +218,7 @@ The repository covers techniques including (but not limited to):
 ---
 # Skills Demonstrated
 
-This project demonstrates practical experience with:
+This project demonstrates hands-on practice with the following security monitoring, threat hunting, and investigation skills in a controlled lab environment:
 
 - Threat Hunting
 - Detection Engineering
@@ -241,6 +243,8 @@ This project demonstrates practical experience with:
 This repository was created to consolidate practical Active Directory threat hunting knowledge into a structured investigation portfolio.
 
 The objective is to document not only how specific attacks work, but also how defenders can detect, investigate, and attribute malicious activity through log analysis, event correlation, and behavioral detection techniques commonly used within modern Security Operations Centers.
+
+All investigations are based on Hack The Box Academy training environments and are presented as independent technical write-ups of practical exercises, rather than investigations conducted in a production SOC environment.
 
 
 
