@@ -109,6 +109,10 @@ Logon_Process
 |-------|-------|
 | Computer Name | `BLUE.corp.local` |
 
+### Figure 5 - NewCredentials Authentication Analysis 
+
+![Pass-the-Hash NewCredentials Authentication](images/credentials-abuse-attack-detection/pass-the-hash-newcredentials.jpeg)
+
 ### Query Analysis
 
 The search followed a four-stage filtering process:
