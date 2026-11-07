@@ -2,21 +2,28 @@
 
 ## Executive Summary 
 
-This investigation focused on detecting Kerberos ticket forgery within an Active Directory environment using Splunk by analyzing Kerberos authentication events, user baseline validation, explicit credential usage, privilege assignments, and service-specific authentication activity.
+This investigation examined authentication anomalies potentially associated with Kerberos ticket forgery in an Active Directory lab environment using Splunk. The analysis focused on user baseline validation, Windows Security events, explicit credential usage, privilege assignments, and service-specific authentication activity.
 
 The investigation introduces the two primary Kerberos ticket forgery techniques—Golden Ticket and Silver Ticket—and demonstrates how multiple Windows Security events can be correlated to identify authentication behavior consistent with forged Kerberos tickets.
 
-Although both techniques are presented to establish the investigative context, the practical investigation primarily focuses on identifying a suspected Silver Ticket attack by correlating user activity, authentication events, privilege assignments, and accessed services.
+The practical investigation focused on a suspected Silver Ticket scenario. A baseline comparison identified the account Barbi on **SQLSERVER.corp.local**, and subsequent analysis examined Event IDs 4624, 4634, 4648, and 4672, including a recorded reference to the CIFS service.
 
 ## Investigation Objectives 
 
 •  Understand the differences between Golden Ticket and Silver Ticket attacks. 
+
 •  Identify authentication artifacts associated with forged Kerberos tickets. 
+
 •  Detect suspicious Kerberos authentication activity using Splunk. 
+
 •  Compare observed users against an established authentication baseline. 
+
 •  Identify previously unseen or anomalous user accounts. 
+
 •  Correlate Windows Security events, user activity, and privilege assignments to support attribution. 
+
 •  Identify the service targeted by a suspected forged Kerberos ticket. 
+
 •  Map observed behavior to the MITRE ATT&CK framework.
 
 ## Background 
@@ -25,37 +32,51 @@ Although both techniques are presented to establish the investigative context, t
 
 | Feature | Golden Ticket | Silver Ticket |
 |---------|---------------|---------------|
-| **Forged Ticket** | Ticket Granting Ticket (TGT) | Ticket Granting Service (TGS) |
+| **Forged Ticket** | Ticket Granting Ticket (TGT) | Service Ticket (TGS) |
 | **Compromised Secret** | KRBTGT account hash | Service or computer account hash |
-| **Authentication Scope** | Entire Active Directory domain | Specific service only |
+| **Authentication Scope** | Potentially broad domain access, depending on the forget ticket and privileges | Specific service only |
 | **Typical Target** | Domain Controllers and domain resources | Individual Kerberos-enabled services (e.g., CIFS, MSSQL, HTTP) |
-| **KDC Communication** | Required initially to obtain or validate tickets | Often bypassed after ticket creation because some services validate tickets locally |
-| **Persistence** | High (domain-wide persistence) | Medium (service-specific persistence) |
-| **Detection Focus** | KRBTGT compromise, abnormal TGT activity, privileged authentication anomalies | Service-specific authentication, SPN usage, explicit credential events, and user anomalies |
+| **KDC Communication** | Forged TGTs are typically presented to the KDC to request service tickets | Often bypassed after ticket creation because some services validate tickets locally |
+| **Persistence** | May enable continued access while the compromised key remains usable | May enable repeated access to the affected service |
+| **Detection Focus** | KRBTGT compromise, abnormal TGT activity, privileged authentication anomalies | Service-specific authentication, SPN usage and user anomalies |
 
 ### Key Detection Artifacts
 
 #### Golden Ticket Detection Artifacts 
 
 •	KRBTGT compromise 
+
 •	DCSync activity 
+
 •	LSASS access on Domain Controllers 
+
 •	NTDS.dit extraction 
+
 •	Abnormal Kerberos ticket issuance 
+
 •	Privileged authentication anomalies
 
 #### Silver Ticket Detection Artifacts 
 
 •	Service-specific authentication 
+
 •	Unknown or non-baselined users 
-•	Event ID 4648 (Explicit Credentials) 
-•	Event ID 4672 (Special Privileges Assigned) 
+
+•	Authentication anomalies, including Event ID 4648 (Explicit Credentials) where relevant to the investigated activity
+
+•	Privileged logon context from Event ID 4672 (Special Privileges Assigned) 
+
 •	Service Principal Names (SPNs) 
+
 •	Target service correlation 
+
+These artifacts provide investigation context rather than definitive indicators of ticket forgery. Event IDs 4648 and 4672 can occur during legitimate authentication and administrative activity.
 
 ## Why Silver Tickets Are Difficult to Detect 
 
 Silver Ticket attacks are often more difficult to detect than Golden Ticket attacks because the forged Ticket Granting Service (TGS) is created using a compromised service account hash rather than the KRBTGT account hash. Since many services validate Kerberos service tickets locally, authentication may occur without contacting the Key Distribution Center (KDC), resulting in fewer Kerberos authentication events and reduced visibility in domain controller logs. As a result, defenders must rely on behavioral indicators such as anomalous service access, explicit credential usage, privilege assignments, Service Principal Name (SPN) analysis, and deviations from established authentication baselines rather than individual Kerberos events alone.
+
+This makes service-side authentication telemetry, unusual account activity, SPN analysis, and correlation with available endpoint evidence important during investigations of suspected forged service tickets.
 
 ## MITRE ATT&CK Mapping (Background) 
 
@@ -70,57 +91,39 @@ Silver Ticket attacks are often more difficult to detect than Golden Ticket atta
 |---------|----------|
 | Splunk Index (`main`) | Centralized collection and analysis of Windows event data |
 | Windows Security Logs | Kerberos authentication, logon, and privilege events |
-| Sysmon | Process and system activity correlation (where applicable) |
 | Lookup Table (`users.csv`) | Baseline user validation |
 | Event ID 4624 | Successful logon detection |
 | Event ID 4648 | Explicit credential logon analysis |
 | Event ID 4672 | Privileged logon identification |
-| Event ID 4768 | Kerberos Authentication Service (AS-REQ/TGT) requests |
-| Event ID 4769 | Kerberos Service Ticket (TGS) requests |
-| Event ID 4770 | Kerberos ticket renewal activity |
 | Service Principal Names (SPNs) | Identification of targeted Kerberos services |
+
+**Additional observed event**: Event ID 4634 (Logoff) was returned by the second investigation query.
+
+The documented SPL searches directly use Event ID 4624 and subsequently identify Events 4634, 4648, and 4672. Although Kerberos Events 4768, 4769, and 4770 are relevant to ticket investigations, the supplied queries do not demonstrate analysis of those event IDs.
 
 ## Investigation Scope 
 
-The investigation focused on identifying forged Kerberos ticket activity by correlating Kerberos authentication events, user baseline validation, privilege assignments, explicit credential usage, and service-specific authentication telemetry. Although both Golden Ticket and Silver Ticket techniques are introduced to establish the investigative context, the practical investigation primarily examines a suspected Silver Ticket attack by identifying users absent from the expected baseline and correlating authentication events with the accessed service to determine whether the observed behavior is consistent with the use of a forged service ticket.
+The investigation focused on identifying unusual authentication activity that could warrant further analysis for potential Silver Ticket abuse. The practical workflow compared successful logons against a user baseline, identified an unexpected account, examined related Windows Security events, and investigated the service associated with the recorded authentication activity.
 
-## Investigatoin Methodology 
+## Investigation Methodology 
 
 The investigation followed a structured correlation process designed to identify authentication activity consistent with a forged Kerberos service ticket:
 
-1.	Import the baseline user list into Splunk for user validation. 
-2.	Compare observed authentication activity against the established baseline. 
-3.	Identify newly observed or anomalous user accounts. 
-4.	Validate successful authentication events associated with suspicious users. 
-5.	Correlate related Windows Security Events, including explicit credential usage and privilege assignments. 
-6.	Identify the service accessed during the authentication sequence. 
+1.	Import the baseline user list into Splunk for user validation.
+   
+2.	Compare observed authentication activity against the established baseline.
+   
+3.	Identify newly observed or anomalous user accounts.
+   
+4.	Validate successful authentication events associated with suspicious users.
+   
+5.	Correlate related Windows Security Events, including explicit credential usage and privilege assignments.
+   
+6.	Identify the service accessed during the authentication sequence.
+   
 7.	Assess whether the observed authentication pattern is consistent with the use of a forged Silver Ticket.
 
-## Challenge Context
-
-During this investigation, the SOC team analyzed Splunk logs after authentication events revealed activity associated with a previously unseen user account. The objective was to determine whether the observed authentication pattern represented legitimate administrative activity or the use of a forged Kerberos service ticket consistent with a Silver Ticket attack.
-
-Rather than relying on a single authentication event, the investigation required analysts to:
-
-•	validate observed users against an organizational baseline, 
-•	identify newly observed or anomalous user accounts, 
-•	review successful authentication events, 
-•	correlate explicit credential usage and privilege assignments, 
-•	identify the service accessed during authentication, 
-•	determine whether the observed behavior was consistent with the use of a forged Kerberos service ticket.
-
-## Investigation Overview 
-
-Before examining individual events, the investigation adopted a hypothesis-driven approach to determine whether the observed authentication activity was consistent with Kerberos ticket forgery. Rather than relying on a single Windows Security Event, multiple authentication artifacts were correlated with user baseline validation, explicit credential usage, privilege assignments, and service access information to reconstruct the complete authentication sequence.
-
-The investigation focused on determining:
-
-•	whether the authenticated account was present in the expected user baseline, 
-•	whether explicit credentials were used during authentication, 
-•	which service was accessed through the Kerberos ticket, 
-•	whether the observed authentication pattern was consistent with the use of a forged Silver Ticket.
-
-## Investigation Query #1  
+## Baseline Validation and Anomalous User Identification   
 
 ### Purpose:
 
@@ -145,13 +148,17 @@ index=main latest=1690545656 EventCode=4624
 | Suspicious User | `Barbi` |
 | Computer | `SQLSERVER.corp.local` |
 
+**Query validation note**: The search identifies users whose earliest observed successful logon within the searched dataset falls after the specified cutoff and who do not match the lookup. The field **Events** must exist in **users.csv** for the final null check to work as intended. If the lookup contains only a **user** column, a different existence-check method is required.
+
+The use of **firstTime** also depends on the search's time coverage. Without a clearly defined historical window, the query cannot independently establish that an account has never appeared before.
+
 ### Query Analysis:
 
 The query identifies successful logons (Event ID 4624) and compares authenticated users against the imported users.csv lookup table representing the expected user baseline. By filtering for users absent from the lookup, the search highlights newly observed or anomalous accounts requiring further investigation.
 
-The results identified Barbi as a previously unseen user who successfully authenticated to SQLSERVER.corp.local. Because the account was not present in the established baseline, additional investigation was required to determine whether the authentication activity represented legitimate administrative behavior or the use of a forged Kerberos service ticket.
+The recorded results identified **Barbi** on **SQLSERVER.corp.local** as an account not matched to the expected baseline. This finding warranted further investigation but did not independently establish that the account was unauthorized or that a forged Kerberos ticket was used.
 
-## Investigation Query #2 
+## Authentication Event Correlation
 
 ### Purpose: 
 
@@ -177,15 +184,17 @@ index=main "Barbi" "SQLSERVER"
 
 The query retrieves all Windows Security Events associated with the suspicious account Barbi and the affected host SQLSERVER.corp.local. Rather than examining individual logon events, this step establishes which authentication-related events are available for further investigation.
 
-Among the returned events, Event ID 4648 (Logon Attempt Using Explicit Credentials) is particularly significant because it records authentication performed using explicitly supplied credentials. In the context of Kerberos ticket forgery, this event may reveal the target service accessed during authentication and therefore provides a valuable investigative lead for identifying potential Silver Ticket activity.
+**Technical note**: The query searches for the terms **Barbi** and **SQLSERVER** across indexed events rather than explicitly filtering the user and **ComputerName** fields. The resulting events should be inspected individually to confirm that they refer to the intended account and host.
 
-Event ID 4672 is also noteworthy because it indicates that privileged rights were assigned during the logon session. While this event alone does not confirm malicious activity, correlating it with explicit credential usage and service access helps reconstruct the complete authentication sequence.
+Among the returned events, Event ID 4648 is relevant because it records an attempt to log on using explicitly supplied credentials. Its event fields can help identify the account and target server associated with the attempt, but it does not independently establish Kerberos ticket forgery.
 
-## Investigation Query #3
+Event ID 4672 is also noteworthy because it indicates that privileged rights were assigned during the logon session. While this event alone does not confirm malicious activity, correlating it with explicit credential usage and service access helps reconstruct the available authentication sequence.
+
+## Event ID 4648 - Target Service Investigation
 
 ### Purpose: 
 
-Inspect the Event ID 4648 record to identify the target service accessed through explicit credentials and determine whether the authentication activity is consistent with a forged Kerberos service ticket.
+Inspect the Event ID 4648 record to identify the account and target server associated with explicit credential usage and investigate the recorded service information.
 
 ### Investigation Step:
 
@@ -201,17 +210,19 @@ Open the Event ID 4648 (Logon Attempt Using Explicit Credentials) record identif
 
 ### Query Analysis:
 
-Inspection of Event ID 4648 revealed that the suspicious account Barbi authenticated using explicitly supplied credentials to access the CIFS service hosted on SQLSERVER.corp.local.
+The recorded investigation findings associate account **Barbi** with an Event ID 4648 entry referencing **SQLSERVER.corp.local** and the CIFS service. Event ID 4648 records an explicit-credential logon attempt; by itself, it does not prove that authentication succeeded or that a forged Kerberos service ticket was used.
 
-The CIFS Service Principal Name (SPN) identifies the target service associated with the Kerberos authentication request. Because Silver Ticket attacks forge service tickets (TGS) for specific SPNs rather than Ticket Granting Tickets (TGTs), identifying the accessed service is a critical step in confirming the intended target of the forged ticket.
+CIFS is a Kerberos service class commonly associated with SMB file-sharing access. Silver Ticket attacks can involve forged service tickets for specific SPNs, making service identification relevant to the investigative hypothesis. However, the exact SPN and its source event field should be verified before concluding that a particular Kerberos service ticket was presented.
 
-Although Event ID 4648 alone does not prove the existence of a Silver Ticket attack, correlating the accessed service with the anomalous user account, successful authentication events, and privilege assignments provides strong evidence supporting the investigative hypothesis.
+The combined findings justify further investigation into possible Silver Ticket activity, but they do not directly demonstrate ticket creation, injection, or successful use of a forged service ticket.
 
 ## Investigation Findings 
 
-Comparison against the established user baseline identified the previously unseen account Barbi. Subsequent investigation revealed successful authentication to SQLSERVER.corp.local, followed by Event ID 4648, indicating the use of explicitly supplied credentials during the authentication process. Inspection of the event identified the CIFS service as the target of the authentication request. When correlated with the baseline deviation, authentication activity, and service-specific access, the observed behavior was determined to be consistent with a suspected Silver Ticket attack.
+The baseline comparison identified **Barbi** as an account requiring investigation on **SQLSERVER.corp.local**. Subsequent analysis returned Windows Security Event IDs 4624, 4634, 4648, and 4672, providing visibility into successful logons, logoffs, explicit credential usage, and privileged logon activity.
 
-No single event independently confirmed Kerberos ticket forgery; rather, the conclusion was reached by correlating baseline validation, authentication events, explicit credential usage, and service access throughout the investigation.
+Inspection of the recorded Event ID 4648 findings associated the account with the CIFS service on **SQLSERVER.corp.local**. Together, these artifacts supported further investigation of a possible Silver Ticket scenario, although the available evidence did not independently confirm forged Kerberos ticket use.
+
+The investigation established an authentication anomaly and related service-access context, rather than a definitive finding of Kerberos ticket forgery.
 
 ## Detection Logic
 
@@ -227,6 +238,8 @@ Identify successful authentication events generated by accounts that have not pr
 
 Monitor Windows Security Event ID 4648 (Logon Attempt Using Explicit Credentials) to identify authentication performed using explicitly supplied credentials. Although this event is commonly associated with legitimate administrative activity, it may also reveal the target service accessed during a forged Kerberos authentication sequence and should therefore be correlated with other authentication events. 
 
+This event is not a direct Silver Ticket indicator. It can provide additional authentication context when correlated with anomalous accounts, target server information, and other relevant telemetry.
+
 ### Privileged Authentication:
 
 Review Windows Security Event ID 4672 (Special Privileges Assigned to New Logon) to identify authentication sessions that receive elevated privileges. While privileged logons are common for administrative accounts, correlating Event ID 4672 with anomalous users, explicit credential usage, and service access improves confidence when investigating potential Kerberos ticket forgery.
@@ -236,45 +249,36 @@ Review Windows Security Event ID 4672 (Special Privileges Assigned to New Logon)
 Examine the Service Principal Name (SPN) associated with Kerberos authentication to determine the service targeted by the ticket. Particular attention should be given to commonly targeted services such as:
 
 •	CIFS 
+
 •	HOST 
+
 •	HTTP 
+
 •	MSSQLSvc 
 
-Unexpected access to these services by anomalous users or through explicit credential events may indicate the use of a forged Silver Ticket, especially when combined with deviations from the expected authentication baseline.
+Unexpected service access by anomalous accounts can provide useful investigation leads. However, identifying a forged Silver Ticket requires additional supporting evidence beyond baseline deviations or explicit credential events.
 
-## •	IOC Summary 
+## Investigation Artifacts and Detection References
 
 | IOC | Value |
 |-----|-------|
 | **User** | `Barbi` |
 | **Host** | `SQLSERVER.corp.local` |
-| **Target Service (SPN)** | `cifs/sqlserver` |
 | **Relevant Event IDs** | `4624`, `4648`, `4672` |
+| **Additional Event** | `4634` |
 
-## Figures
-
-### Figure 1. Downloading the investigation resources (users.csv).
-
-### Figure 2. Uploading the users.csv lookup table into Splunk.
-
-### Figure 3. Baseline comparison identifying the suspicious user Barbi.
-
-### Figure 4. Event code distribution associated with Barbi on SQLSERVER.
-
-### Figure 5. Event ID 4648 confirming access to the CIFS service on SQLSERVER.
+The source records the service as **cifs**, but does not provide enough information to independently verify the exact SPN **cifs/sqlserver**. The user, host, service, and event IDs should be described as investigation artifacts rather than confirmed IOCs.
 
 ## MITRE ATT&CK Mapping
 
 
 | Tactic | Technique | ATT&CK ID | Investigation Relevance |
 |--------|-----------|-----------|-------------------------|
-| Credential Access | Golden Ticket | T1558.001 | Forging Ticket Granting Tickets (TGTs) using the KRBTGT account hash |
 | Credential Access | Silver Ticket | T1558.002 | Forging service tickets (TGSs) for specific Service Principal Names (SPNs) |
-| Credential Access | Steal or Forge Kerberos Tickets | T1558 | Abuse of forged Kerberos authentication tickets |
-| Credential Access | Valid Accounts | T1078 | Impersonation of legitimate user accounts through forged Kerberos tickets |
-| Defense Evasion | Defense Evasion | TA0005 | Bypassing normal Kerberos authentication using forged tickets |
-| Lateral Movement | Lateral Movement | TA0008 | Unauthorized access to remote systems and services using forged Kerberos tickets |
 
+**Mapping note**: T1558.002 (Silver Ticket) is the primary technique associated with the investigation hypothesis, rather than an observed technique confirmed by the documented evidence.
+
+T1558.001 (Golden Ticket) was discussed as background but was not practically investigated. T1078, TA0005, and TA0008 should not be presented as confirmed techniques or outcomes based on the supplied results.
 
 ## Lessons Learned
 
@@ -282,13 +286,15 @@ Unexpected access to these services by anomalous users or through explicit crede
 |---------|-------------|
 | Kerberos Ticket Forgery | Golden Ticket and Silver Ticket attacks abuse forged Kerberos tickets but differ significantly in scope, required secrets, and detection opportunities. |
 | Baseline Validation | Comparing authenticated users against an established baseline is an effective method for identifying previously unseen or suspicious accounts. |
-| Explicit Credential Monitoring | Event ID 4648 provides valuable context regarding explicit credential usage and may reveal the target service accessed during authentication. |
-| Service Correlation | Identifying the accessed Service Principal Name (SPN) helps determine the intended target of a forged Kerberos service ticket. |
-| Event Correlation | Correlating successful logons, explicit credential usage, privilege assignments, and service access provides significantly higher confidence than analyzing individual events in isolation. |
-| Behavioral Detection | Kerberos ticket forgery is more reliably detected through behavioral correlation than by relying on a single Windows Security Event. |
-| Silver Ticket Detection | Silver Ticket attacks often generate fewer authentication artifacts than Golden Ticket attacks, making service-specific investigation particularly important. |
-| Threat Hunting | Combining baseline validation with authentication telemetry and SPN analysis provides an effective methodology for hunting forged Kerberos ticket activity in Active Directory environments. |
+| Explicit Credential Monitoring | Event ID 4648 provides valuable context regarding explicit credential usage and may reveal the target server accessed during authentication. |
+| Service Correlation | Identifying the accessed Service Principal Name (SPN) helps determine the intended target of a Kerberos service ticket. |
+| Event Correlation | Correlating successful logons, explicit credential usage, privilege assignments, and service access provides additional investigative context compared with analyzing individual events in isolation. |
+| Behavioral Detection | Kerberos ticket forgery requires supporting evidence beyond isolated authentication anomalies. |
+| Silver Ticket Detection | Silver Ticket attacks may avoid KDC-side ticket issuance events, making service-specific investigation particularly important. |
+| Threat Hunting | Combining baseline validation with authentication telemetry and SPN analysis provides a structured approach for investigating potential ticket forgery in Active Directory environments. |
 
 ## Conclusion
 
-This investigation demonstrated how suspected Kerberos ticket forgery can be investigated by correlating Windows Security Events, user baseline validation, explicit credential usage, privilege assignments, and service-specific authentication activity within Splunk. Although both Golden Ticket and Silver Ticket techniques were examined conceptually, the practical investigation focused on identifying behavior consistent with a forged Silver Ticket through systematic event correlation. Combining baseline validation with authentication telemetry and Service Principal Name (SPN) analysis provides defenders with a structured methodology for detecting Kerberos ticket abuse while improving investigative confidence and reducing false positives.
+This investigation demonstrated a Splunk-based workflow for examining authentication anomalies potentially associated with Silver Ticket abuse. Baseline validation identified the account **Barbi** on **SQLSERVER.corp.local**, while subsequent Windows Security event analysis identified logon, explicit credential, and privilege-related activity, including a recorded association with the CIFS service.
+
+The investigation illustrates how user baseline comparisons and authentication event correlation can support Kerberos ticket forgery threat hunting. Although the available results did not independently confirm a forged service ticket, the documented workflow provides a foundation for further service-specific authentication analysis and detection engineering.
