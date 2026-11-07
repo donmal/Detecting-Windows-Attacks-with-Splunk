@@ -100,6 +100,9 @@ index=main source="WinEventLog:SilkService-Log"
 | search SearchFilter="*(samAccountType=805306368)*"
 | stats count by ProcessName
 ``` 
+### Figure 1 - LDAP User Enumeration 
+
+![LDAP User Enumeration](images/ldap-user-enumeration.png)
 
 ### Query Breakdown
 
@@ -165,6 +168,10 @@ Among these, **rundll32.exe** represented the most unusual process and warranted
 The presence of Rubeus and SharpHound was also relevant because these tools can be associated with offensive Active Directory operations. However, process identification and LDAP filter matches alone are insufficient to establish malicious intent without additional context.
 
 The **N/A** result also indicates that some matching events did not contain an identifiable process name, limiting process attribution for those records.
+
+### Figure 2 - LDAP SearchFilter Evidence 
+
+![LDAP SearchFilter Evidence](images/ldap-searchfilter-evidence.png)
 
 ## Suspicious Process Analysis - rundll32.exe 
 
