@@ -133,7 +133,7 @@ The recorded results identify Rubeus.exe and rundll32.exe as process images asso
 
 ### Figure 7 - Sysmon Process-to-Network Correlation 
 
-![Overpass-the-Hash Kerberos Process Correlation](../images/credentials-abuse-attack-detection/overpass-the-hash-kerberos-process-correlation.jpeg)
+![Overpass-the-Hash Kerberos Process Correlation](../images/credentials-abuse-attack-detection/overpass-the-hash-kerberos-process-correlation.png)
 
 ### Query Analysis
 
