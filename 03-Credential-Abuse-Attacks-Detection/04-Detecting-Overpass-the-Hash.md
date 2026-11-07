@@ -131,6 +131,10 @@ process
 
 The recorded results identify Rubeus.exe and rundll32.exe as process images associated with the investigation. The original result labels rundll32.exe as the "Missing Image"; this label should be clarified if the original Splunk output is available.
 
+### Figure 7 - Sysmon Process-to-Network Correlation 
+
+![Overpass-the-Hash Kerberos Process Correlation](../images/credentials-abuse-attack-detection/overpass-the-hash-kerberos-process-correlation.jpeg)
+
 ### Query Analysis
 
 The search identifies Sysmon Event ID 3 connections targeting destination port 88 while excluding connections initiated by **lsass.exe**. Sysmon Event ID 1 records are included to provide process creation context, with correlation attempted through the process identifier.
