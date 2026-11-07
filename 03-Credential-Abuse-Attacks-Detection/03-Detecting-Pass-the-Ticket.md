@@ -133,6 +133,11 @@ category
 
 The recorded results identified **Administrator** and **YOUNG_WILKINSON** as accounts associated with the transaction analysis. The supplied results additionally highlighted **YOUNG_WILKINSON**, although the meaning of the original label "Missing Username" cannot be established from the summary alone.
 
+### Figure 6 - Kerberos Transaction Analysis 
+
+![Kerberos Transaction Analysis](../images/credentials-abuse-attack-detection/pass-the-ticket-kerberos-transaction.jpeg)
+
+
 ### Query Analysis 
 
 The SPL search collects Kerberos Event IDs 4768, 4769, and 4770 while filtering out machine accounts. It extracts normalized usernames and IPv4 addresses, then groups related authentication events using Splunk's **transaction** command over a maximum ten-hour window.
