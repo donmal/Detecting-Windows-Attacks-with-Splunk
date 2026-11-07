@@ -148,6 +148,10 @@ index=main latest=1690545656 EventCode=4624
 | Suspicious User | `Barbi` |
 | Computer | `SQLSERVER.corp.local` |
 
+### Figure 8 - Baseline Validation and Anomalous User Identification 
+
+![Silver Ticket Baseline Validation](../images/kerberos-ticket-forgery-investigation/silver-ticket-baseline-validation.png)
+
 **Query validation note**: The search identifies users whose earliest observed successful logon within the searched dataset falls after the specified cutoff and who do not match the lookup. The field **Events** must exist in **users.csv** for the final null check to work as intended. If the lookup contains only a **user** column, a different existence-check method is required.
 
 The use of **firstTime** also depends on the search's time coverage. Without a clearly defined historical window, the query cannot independently establish that an account has never appeared before.
@@ -180,6 +184,10 @@ index=main "Barbi" "SQLSERVER"
 | 4648 | Logon Attempt Using Explicit Credentials |
 | 4672 | Special Privileges Assigned to New Logon |
 
+### Figure 9 - Authentication Event Correlation 
+
+![Silver Ticket Authentication Events](../images/kerberos-ticket-forgery-investigation/silver-ticket-authentication-events.png)
+
 ### Query Analysis:
 
 The query retrieves all Windows Security Events associated with the suspicious account Barbi and the affected host SQLSERVER.corp.local. Rather than examining individual logon events, this step establishes which authentication-related events are available for further investigation.
@@ -207,6 +215,10 @@ Open the Event ID 4648 (Logon Attempt Using Explicit Credentials) record identif
 | Account | `Barbi` |
 | Target Server | `SQLSERVER.corp.local` |
 | Target Service | `cifs` |
+
+### Figure 10 - Event ID 4648 Target Service Investigation 
+
+![Silver Ticket CIFS Service Investigation](../images/kerberos-ticket-forgery-investigation/silver-ticket-cifs-service-investigation.png)
 
 ### Query Analysis:
 
