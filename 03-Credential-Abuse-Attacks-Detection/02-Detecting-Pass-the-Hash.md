@@ -1,16 +1,24 @@
 # 02 - Detecting Pass-the-Hash 
+Write-up of Hack The Box Academy labs. Practice work.
 
 ## Executive Summary 
 
-This investigation focused on detecting Pass-the-Hash (PtH) activity in Splunk by analyzing Windows Security Events, Sysmon telemetry, and authentication artifacts. The investigation correlated NewCredentials logon sessions with LSASS memory access to identify behavioral patterns commonly associated with NTLM hash abuse and credential-based lateral movement.
+This investigation examined Windows authentication artifacts associated with potential Pass-the-Hash (PtH) activity using Splunk. The analysis focused on NewCredentials logon sessions, Windows Security Event ID 4624, and Sysmon telemetry related to LSASS process access.
+
+The initial investigation identified **BLUE.corp.local** as a host generating Logon Type 9 events through the **seclogo** logon process. A second Splunk query was developed to correlate LSASS access with subsequent NewCredentials authentication events, providing a behavioral detection approach for identifying potential credential abuse.
 
 ## Investigation Objectives 
 
 - Detect Pass-the-Hash authentication artifacts.
+  
 - Identify NewCredentials logon sessions.
+  
 - Analyze the relationship between Logon Type 9 and the Secondary Logon service.
+  
 - Correlate LSASS access with authentication activity.
+  
 - Reduce false positives through event correlation.
+  
 - Map observed behavior to MITRE ATT&CK. 
 
 ## Background 
@@ -19,58 +27,22 @@ This investigation focused on detecting Pass-the-Hash (PtH) activity in Splunk b
 
 Pass-the-Hash (PtH) is a credential abuse technique in which an attacker authenticates using an NTLM hash instead of the user's plaintext password. By leveraging stolen authentication material, attackers can access remote systems without ever knowing the original credentials.
 
-Pass-the-Hash is commonly associated with:
+## Authentication Artifacts Relevant to Detection
 
--	Lateral Movement
--	Privilege Escalation
--	Active Directory compromise
--	Post-exploitation operations
+Pass-the-Hash activity may involve credential material manipulation, NewCredentials logon sessions, and subsequent remote authentication. These behaviors can be investigated through Windows Security logs and Sysmon process telemetry.
 
-One of the most widely used tools for performing Pass-the-Hash attacks is **Mimikatz**.
-
-### Access Tokens
-
-When a user successfully authenticates to Windows, the operating system creates an Access Token representing that security context.
-
-An Access Token contains:
-
--	User SID
--	Group memberships
--	Assigned privileges
--	Security context
-
-Every child process created by the authenticated user inherits a copy of this token. 
-
-### Logon Sessions
-
-Each Access Token is associated with a Logon Session containing the authentication material required by Windows.
-
-A Logon Session typically includes:
-
--	Username
--	Domain
--	Authentication material
--	NTLM hash
--	LM hash
-
-During Pass-the-Hash attacks, adversaries manipulate the authentication material associated with the Logon Session rather than using the user's plaintext password.
-
-### runas dhe /netonly
-
-Windows provides the `runas` utility to execute processes under alternate credentials.
-
-Example:
-
-```cmd
-runas /user:CORP\Administrator cmd.exe
-```
+Legitimate administrative activity, particularly **runas /netonly**, may produce similar authentication artifacts. Consequently, Logon Type 9 should be treated as an investigation lead rather than conclusive evidence of Pass-the-Hash.
 
 ## Key Detection Artifact 
 
-One of the strongest authentication artifacts associated with Pass-the-Hash is:
--	Security Event ID 4624 
--	Logon Type = 9 
--	Logon Process = seclogo 
+One of the relevant authentication patterns associated with Pass-the-Hash is:
+
+-	Security Event ID 4624
+  
+-	Logon Type = 9
+  
+-	Logon Process = seclogo
+  
 This combination indicates a **NewCredentials** authentication session and is frequently observed during Pass-the-Hash attacks, credential injection, and legitimate `runas /netonly` executions.
 
 ## MITRE ATT&CK Mapping (Background) 
@@ -101,11 +73,16 @@ The investigation focused on identifying hosts exhibiting NewCredentials authent
 The investigation followed a structured four-stage correlation process:
 
 1. Identify successful NewCredentials logon sessions.
+   
 2. Filter authentication events using Logon Type 9.
+   
 3. Validate the Secondary Logon process (seclogo).
-4. Attribute the activity to the originating host. 
+   
+4. Attribute the activity to the originating host.
 
-## Investigation Query #1
+A subsequent correlation query examined Sysmon Event ID 10 activity targeting LSASS alongside NewCredentials logons to develop a more context-aware detection approach.
+
+## NewCredentials Authentication Analysis
 
 ### Purpose:
 
@@ -135,10 +112,16 @@ Logon_Process
 ### Query Analysis
 
 The search followed a four-stage filtering process:
+
 1. Identify successful authentication events using Security Event ID 4624.
+   
 2. Filter for Logon Type 9 to isolate NewCredentials sessions.
+   
 3. Restrict results to the `seclogo` logon process.
+   
 4. Identify the host on which the authentication activity occurred.
+
+The results identified **BLUE.corp.local** as a host associated with NewCredentials authentication activity. This finding established a starting point for further investigation but did not independently confirm NTLM hash injection or malicious authentication.
 
 ## Detection Logic 
 
@@ -161,18 +144,23 @@ Sysmon Event ID 10 should be monitored for access to `lsass.exe`. Classical Pass
 
 ### Event Correlation 
 
-The highest-confidence detection pattern combines:
+A stronger behavioural detection approach correlates:
 
 - Sysmon Event ID 10 targeting `lsass.exe`
+  
 - Credential extraction or manipulation
+  
 - Security Event ID 4624
+  
 - Logon Type 9
+  
 - `seclogo`
+  
 - Subsequent remote authentication activity
 
-This correlation is significantly more reliable than analyzing NewCredentials logons in isolation.
+Combining these artifacts can improve detection confidence compared with analyzing Logon Type 9 events alone. However, LSASS access and NewCredentials authentication may also occur during legitimate operations, requiring additional contextual validation.
 
-## Investigation Query #2
+## LSASS Access and NewCredentials Correlation
 
 ### Purpose:
 
@@ -209,59 +197,37 @@ Logon_Process
 
 ### Query Analysis
 
-The second query extends the initial investigation by correlating Security Event ID 4624 with Sysmon Event ID 10. This approach combines authentication activity with LSASS memory access, producing a behavioral pattern that more closely resembles Pass-the-Hash activity while significantly reducing false positives.
+The second query extends the initial investigation by correlating Security Event ID 4624 with Sysmon Event ID 10. This approach combines authentication activity with LSASS memory access, producing a behavioral pattern that more closely resembles Pass-the-Hash activity while potentially improving detection specificity.
 
 ### Why the Correlation Query is Stronger
 
 The first query detects Security Event ID 4624 events with Logon Type 9 and the `seclogo` logon process. Although this is a useful indicator, legitimate `runas /netonly` activity may generate the same authentication pattern.
 
-The second query adds Sysmon Event ID 10 telemetry showing access to `lsass.exe`. Correlating LSASS access with a subsequent NewCredentials logon significantly reduces false positives and produces a behavioral pattern more consistent with Pass-the-Hash activity.
+The second query adds Sysmon Event ID 10 telemetry showing access to `lsass.exe`. Correlating LSASS access with a subsequent NewCredentials logon provides additional context and may reveal a behavioral pattern more consistent with Pass-the-Hash activity.
 
-## IOC Summary
+**Investigation limitation**: The documented query uses a one-minute transaction window to associate LSASS access with subsequent authentication events on the same host. This provides temporal correlation but does not independently prove that the LSASS access caused the NewCredentials logon. The source document also does not include a concrete result table for this second query, so its effectiveness cannot be confirmed from the supplied evidence alone.
+
+## Investigation Artifacts and Detection References
 
 | IOC Type | Value |
 |-----------|-------|
-| Security Events | 4624, 4648, 4672 |
-| Sysmon Events | 1, 10 |
 | Authentication Indicators | Logon Type 9, Logon Process = seclogo |
-| Processes | mimikatz.exe, runas.exe |
-| Commands | sekurlsa::pth |
 | Host | BLUE.corp.local |
 
-## Figures
+**Relevant Event IDs**: Security Event ID 4624 and Sysmon Event ID 10 were used in the documented investigation queries. Additional events, such as 4648 and 4672, may provide authentication and privilege context during further analysis.
 
-### **Figure 1.** Mimikatz credential dumping demonstration. 
-Mimikatz Credential Dumping
-
-### **Figure 2.** NTLM hash extraction.
-NTLM Hash Extraction
-
-### **Figure 3.** runas /netonly execution.
-runas /netonly Demonstration
-
-### **Figure 4.** Security Event ID 4624 (Logon Type 9).
-Event ID 4624
-(Logon Type 9)
-
-### **Figure 5.** Sysmon Event ID 10 (LSASS access). 
-Sysmon Event ID 10
-(LSASS Access)
-
-### **Figure 6.** Splunk Pass-the-Hash detection query. 
-Splunk Detection Query
-
-### **Figure 7.** Investigation results identifying BLUE.corp.local. 
-
-Results
+The host and authentication indicators are investigation artifacts rather than standalone Indicators of Compromise. The supplied results do not independently demonstrate Mimikatz execution or the use of **sekurlsa::pth**.
 
 ## MITRE ATT&CK Mapping
 
 | Tactic | Technique | ATT&CK ID | Investigation Relevance |
 |--------|-----------|-----------|-------------------------|
 | Credential Access | OS Credential Dumping: LSASS Memory | T1003.001 | Credential extraction from LSASS |
-| Credential Access | Pass-the-Hash | T1550.002 | NTLM hash authentication abuse |
-| Lateral Movement | Lateral Movement | TA0008 | Authentication to remote systems |
-| Defense Evasion | Defense Evasion | TA0005 | Credential abuse using legitimate authentication mechanisms |
+| Defense Evasion / Lateral Movement | Pass-the-Hash | T1550.002 | NTLM hash authentication abuse |
+
+**Mapping note**: T1550.002 (Pass the Hash) is the primary technique investigated in this section. T1003.001 (OS Credential Dumping: LSASS Memory) is relevant to the LSASS-access detection logic but should not be treated as a confirmed credential-dumping finding without additional evidence of credential extraction.
+
+The documented results establish NewCredentials authentication activity on **BLUE.corp.local**, while the correlation query represents a detection approach for investigating possible Pass-the-Hash behavior. The supplied evidence does not independently confirm successful Pass-the-Hash authentication or lateral movement.
 
 ## Lessons Learned
 
@@ -271,10 +237,11 @@ Results
 | Authentication Artifacts | Logon Type 9 is a valuable indicator but should not be treated as conclusive evidence. |
 | Administrative Activity | `runas /netonly` produces artifacts similar to Pass-the-Hash and requires contextual analysis. |
 | LSASS Monitoring | Monitoring LSASS access significantly improves detection capability. |
-| Event Correlation | Correlating Security and Sysmon events greatly reduces false positives. |
+| Event Correlation | Correlating Security and Sysmon events can improve detection specificity when supported by appropriate contextual validation. |
 | Behavioral Detection | Behavioral correlation is more reliable than monitoring isolated events. |
-| Lateral Movement | Pass-the-Hash remains one of the most common techniques used for Active Directory lateral movement. |
 
 ## Conclusion
 
-This investigation demonstrated how Pass-the-Hash activity can be detected by correlating Windows Security events, Sysmon telemetry, and authentication artifacts within Splunk. Combining NewCredentials logons, LSASS memory access, and process telemetry provides defenders with high-confidence visibility into credential abuse while significantly improving detection accuracy and reducing false positives.
+This investigation demonstrated a Splunk-based approach for identifying authentication artifacts associated with potential Pass-the-Hash activity. Analysis of Windows Security Event ID 4624 identified NewCredentials logon sessions on **BLUE.corp.local**, while a second SPL query was developed to correlate LSASS process access with subsequent authentication events.
+
+The investigation highlights the importance of combining Windows authentication logs with Sysmon process telemetry to improve visibility into potential credential abuse. Although the documented results do not independently confirm successful Pass-the-Hash execution, the correlation methodology provides a foundation for further threat hunting and detection engineering.
