@@ -150,7 +150,7 @@ index=main latest=1690545656 EventCode=4624
 
 ### Figure 8 - Baseline Validation and Anomalous User Identification 
 
-![Silver Ticket Baseline Validation](../images/kerberos-ticket-forgery-investigation/silver-ticket-baseline-validation.jpeg)
+![Silver Ticket Baseline Validation](https://github.com/donmal/Detecting-Windows-Attacks-with-Splunk/blob/main/images/kerberos-ticket-forgery-investigation/silver-ticket-baseline-validation.jpeg?raw=true)
 
 **Query validation note**: The search identifies users whose earliest observed successful logon within the searched dataset falls after the specified cutoff and who do not match the lookup. The field **Events** must exist in **users.csv** for the final null check to work as intended. If the lookup contains only a **user** column, a different existence-check method is required.
 
