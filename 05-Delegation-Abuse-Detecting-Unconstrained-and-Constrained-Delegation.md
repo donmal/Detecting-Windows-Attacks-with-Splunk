@@ -134,6 +134,10 @@ Message="*userAccountControl:1.2.840.113556.1.4.803:=524288*"
 | Hosts Identified | `BLUE.corp.local`, `DC01.corp.local` |
 | Additional Host | `DC01.corp.local` |
 
+### Figure 11 - Unconstrained Delegation Discovery 
+
+![Unconstrained Delegation PowerShell Analysis](../images/delegation-abuse-detecting-unconstrained-and-constrained-delegation/unconstrained-delegation-powershell.jpeg)
+
 ### Query Analysis: 
 
 The search examines PowerShell Script Block Logging (Event ID 4104) for references to **TrustedForDelegation** or the corresponding **userAccountControl** LDAP matching rule.
@@ -207,6 +211,10 @@ source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
 | Process | `Rubeus.exe` |
 | Destination Port | `88` |
 | Activity | Kerberos communication |
+
+### Figure 12 - Kerberos Network Activity and Rubeus Investigation
+
+![Kerberos Network Activity](../images/credentials-abuse-attack-detection/overpass-the-hash-kerberos-process-correlation.png)
 
 ### Query Analysis: 
 
