@@ -150,7 +150,7 @@ index=main latest=1690545656 EventCode=4624
 
 ### Figure 8 - Baseline Validation and Anomalous User Identification 
 
-![Silver Ticket Baseline Validation](../images/kerberos-ticket-forgery-investigation/silver-ticket-baseline-validation.png)
+![Silver Ticket Baseline Validation](../images/kerberos-ticket-forgery-investigation/silver-ticket-baseline-validation.jpeg)
 
 **Query validation note**: The search identifies users whose earliest observed successful logon within the searched dataset falls after the specified cutoff and who do not match the lookup. The field **Events** must exist in **users.csv** for the final null check to work as intended. If the lookup contains only a **user** column, a different existence-check method is required.
 
@@ -186,7 +186,7 @@ index=main "Barbi" "SQLSERVER"
 
 ### Figure 9 - Authentication Event Correlation 
 
-![Silver Ticket Authentication Events](../images/kerberos-ticket-forgery-investigation/silver-ticket-authentication-events.png)
+![Silver Ticket Authentication Events](../images/kerberos-ticket-forgery-investigation/silver-ticket-authentication-events.jpeg)
 
 ### Query Analysis:
 
@@ -218,7 +218,7 @@ Open the Event ID 4648 (Logon Attempt Using Explicit Credentials) record identif
 
 ### Figure 10 - Event ID 4648 Target Service Investigation 
 
-![Silver Ticket CIFS Service Investigation](../images/kerberos-ticket-forgery-investigation/silver-ticket-cifs-service-investigation.png)
+![Silver Ticket CIFS Service Investigation](../images/kerberos-ticket-forgery-investigation/silver-ticket-cifs-service-investigation.jpeg)
 
 ### Query Analysis:
 
