@@ -1,23 +1,9 @@
 # 01 - LDAP Reconnaissance - Detecting LDAP Reconnaissance with Splunk
+Write-up of Hack The Box Academy labs. Practice Work
 
 ## Executive Summary
 
-This investigation focuses on detecting Active Directory reconnaissance activity through LDAP query monitoring in Splunk.
-
-Active Directory reconnaissance is one of the earliest and most important stages of an enterprise intrusion. Before attackers can escalate privileges, move laterally, perform Kerberoasting, abuse delegation, or attempt domain compromise, they usually need to understand the domain structure.
-
-During this phase, adversaries commonly enumerate:
-
-•	Domain users
-•	Domain groups
-•	Domain administrators
-•	Computers
-•	Service accounts
-•	Organizational Units
-•	Group Policy Objects
-•	Trust relationships
-•	Privileged accounts
-•	Attack paths
+This investigation analyzed Active Directory reconnaissance activity using Splunk and LDAP client telemetry collected through SilkService, with a focus on identifying processes performing domain user enumeration.
 
 This investigation examined LDAP query activity captured through SilkService logs and identified processes that performed LDAP searches containing the filter:
 
@@ -26,6 +12,8 @@ This investigation examined LDAP query activity captured through SilkService log
 This filter is commonly associated with domain user enumeration.
 
 The investigation identified multiple processes issuing LDAP queries containing the user enumeration filter *(samAccountType=805306368)*. Among the observed processes, **rundll32.exe** was identified as an unusual source of LDAP reconnaissance activity.
+
+The analysis demonstrated how LDAP search filters and process-level telemetry can be correlated to identify potentially suspicious reconnaissance behavior and generate actionable threat-hunting leads.
 
 ## Investigation Objectives
 
@@ -45,119 +33,11 @@ The objectives of this investigation were:
 
 - Assess whether LDAP queries originating from unexpected Windows processes represent potential reconnaissance activity.
   
-## Background
-
-### What Is Active Directory Reconnaissance?
-
-Active Directory reconnaissance is the process of collecting information about a Windows domain environment.
-
-Attackers use Active Directory reconnaissance to identify domain users, privileged groups, domain-joined computers, elevated accounts, trust relationships, and potential lateral movement or privilege escalation paths. This information supports subsequent stages of an intrusion.
-
-### Native Windows Reconnaissance
-
-Attackers do not always need malware or offensive tools to perform reconnaissance.
-
-Many useful commands already exist on Windows systems.
-
-Examples include:
-
-whoami /all
-wmic computersystem get domain
-net user /domain
-net group "Domain Admins" /domain
-arp -a
-nltest /domain_trusts
-
-Native Windows utilities are frequently used for reconnaissance because they are trusted, Microsoft-signed, and readily available on domain-joined systems.
-
-### Example: Domain Admin Enumeration
-
-A commonly observed reconnaissance command is:
-
-net group "Domain Admins" /domain
-
-This command queries Active Directory for members of the Domain Admins group, providing attackers with a list of high-value privileged accounts.
-
-## Screenshot Placeholder 
-
-Caption: 
-
-Figure 1 - Native Windows command used to enumerate Domain Admins.
-
-## BloodHound and SharpHound Reconnaissance
-
-### What Is BloodHound?
-
-BloodHound is an Active Directory attack path analysis tool.
-It uses graph theory to visualize relationships between:
-
-•	Users
-
-•	Groups
-
-•	Computers
-
-•	Sessions
-
-•	Permissions
-
-•	ACLs
-
-•	Trusts
-
-•	Delegation paths
-
-Attackers use BloodHound to identify privilege escalation and lateral movement paths.
-
-### What Is SharpHound?
-
-SharpHound is the data collector used by BloodHound.
-
-It collects Active Directory data and exports it for BloodHound analysis.
-
-Example execution:
-
-.\SharpHound.exe -c all
-
-This collects a broad set of domain information, including:
-
-•	Group memberships
-
-•	Sessions
-
-•	Logged-on users
-
-•	ACLs
-
-•	Trusts
-
-•	Object properties
-
-•	Local administrators
-
-## Screenshot Placeholder
-
-Caption:
-
-Figure 2 - BloodHound graph showing Active Directory relationships and attack paths.
-
-## Screenshot Placeholder 
-
-Caption:
-
-Figure 3 - SharpHound executed with all collection methods.
-
-## Why LDAP Matters
-
-Under the hood, many AD reconnaissance tools perform LDAP queries.
-
-LDAP stands for:
-
-Lightweight Directory Access Protocol
-
-It is used to query directory services such as Active Directory.
+## LDAP Reconnaissance and Detection Context
 
 LDAP provides direct access to Active Directory objects, allowing users, groups, computers, service accounts and other directory objects to be enumerated through structured search queries.
+
+LDAP query monitoring provides visibility into directory enumeration activity that may not be apparent from process names alone. Correlating search filters with the originating process can help identify unusual reconnaissance behavior.
 
 ## LDAP Search Filters
 
@@ -167,38 +47,13 @@ LDAP queries rely on search filters that define which directory objects should b
 
 This value corresponds to standard domain user accounts. Consequently, LDAP queries containing the filter `*(samAccountType=805306368)*` may indicate Active Directory user enumeration activity.
 
-## Why This Filter Is Important
-
-The filter:
-
-samAccountType=805306368
-
-is commonly used to search for user objects in Active Directory.
-
-Tools such as:
-
-•	SharpHound
-
-•	PowerView
-
-•	Empire
-
-•	Custom LDAP recon tools
-
-•	LOLBIN-based tradecraft
-
-may generate LDAP queries containing this filter
+The filter was selected as the primary detection indicator because it enables investigation of domain user enumeration across multiple processes, including legitimate Windows utilities and offensive security tools.
 
 ## Detection Challenge
 
 By default, Windows does not reliably log all LDAP queries.
 
-Some visibility can come from:
-
-Event ID 1644
-LDAP Diagnostic Logging
-
-Although Event ID 1644 can provide LDAP visibility, comprehensive telemetry is more reliably obtained through the Microsoft-Windows-LDAP-Client ETW Provider. In this investigation, LDAP events were collected using SilkService and analyzed in Splunk.
+Although Event ID 1644 can provide LDAP visibility, additional LDAP client telemetry can be collected using the Microsoft-Windows-LDAP-Client ETW Provider. In this investigation, LDAP events were collected using SilkService and analyzed in Splunk.
 
 ## Data Source
 
@@ -225,6 +80,14 @@ The investigation focused on identifying processes issuing LDAP queries containi
 ## Investigation Methodology
 
 The investigation involved executing a Splunk search across the complete dataset, filtering LDAP queries containing the target SearchFilter value, and grouping the results by ProcessName to identify all processes performing user enumeration.
+
+The investigation followed three analytical steps:
+
+1. Extract LDAP client events and their associated process metadata from SilkService logs.
+
+2. Filter LDAP searches targeting domain user accounts using the **samAccountType=805306368** indicator.
+
+3. Aggregate the matching events by process name and review unusual processes as potential reconnaissance indicators.
 
 ## Splunk Search Used
 
@@ -284,9 +147,9 @@ This filters LDAP searches containing the user enumeration filter.
 
 This summarizes which processes issued the LDAP queries.
 
-## Investigation Findings 
+The final aggregation provides a process-level overview of matching LDAP activity, allowing analysts to identify unusual executables for further investigation.
 
-The Splunk results returned the following process names:
+## Investigation Findings 
 
 The investigation identified the following processes performing LDAP user enumeration:
 
@@ -301,23 +164,15 @@ Among these, **rundll32.exe** represented the most unusual process and warranted
 
 The presence of Rubeus and SharpHound was also relevant because these tools can be associated with offensive Active Directory operations. However, process identification and LDAP filter matches alone are insufficient to establish malicious intent without additional context.
 
-## Why rundll32 Is Interesting
+The **N/A** result also indicates that some matching events did not contain an identifiable process name, limiting process attribution for those records.
+
+## Suspicious Process Analysis - rundll32.exe 
 
 rundll32.exe is a legitimate Windows binary used to execute functions exported from DLL files.
 
-Attackers frequently abuse it because it is:
-
-•	Native to Windows
-
-•	Microsoft-signed
-
-•	Common in enterprise environments
-
-•	Often trusted by security controls
-
-•	Useful for proxy execution
-
 Seeing rundll32 associated with LDAP reconnaissance is suspicious because it suggests LDAP enumeration may have been performed through a proxy execution technique rather than a normal administrative tool.
+
+As a legitimate Windows binary that can be abused for proxy execution, rundll32.exe represents a relevant candidate for deeper investigation when associated with directory enumeration activity.
 
 ## Forensic Interpretation
 
@@ -325,39 +180,7 @@ The observed activity indicates that rundll32.exe issued LDAP queries containing
 
 Further investigation would require correlation with process creation events, command-line arguments, parent processes, DLL execution details, and associated network activity to determine whether the observed LDAP queries were legitimate or attacker-driven.
 
-## Attack Chain Context
-
-This activity belongs to the reconnaissance phase.
-
-In an AD attack lifecycle, it may precede:
-
-LDAP Reconnaissance
-
-        ↓
-        
-SPN Enumeration
-
-        ↓
-        
-Kerberoasting
-
-        ↓
-        
-Credential Theft
-
-        ↓
-        
-Pass-the-Hash / Pass-the-Ticket
-
-        ↓
-        
-Delegation Abuse
-
-        ↓
-        
-DCSync / Domain Compromise
-
-This sequence represents a possible attack progression and should not be interpreted as a confirmed attack chain observed in the current investigation.
+The available evidence supports suspicious LDAP enumeration activity but does not independently confirm successful compromise, malicious DLL execution, or attacker-controlled process behavior.
 
 ## Detection Opportunities
 
@@ -387,6 +210,8 @@ Prioritize unusual process names such as:
 
 - mshta
 
+These process names should be treated as investigation candidates rather than standalone indicators of compromise. Their relevance depends on the associated LDAP filters, execution context, and expected administrative activity.
+
 ### Detect High-Volume LDAP Queries
 
 A single query may be normal.
@@ -399,6 +224,8 @@ Example logic:
 | where count > 10
 
 The threshold of 10 events is illustrative and should be calibrated against normal LDAP activity in the monitored environment to reduce false positives.
+
+This detection logic is a proposed hunting opportunity and was not validated as a production detection rule in the investigation.
 
 ### Detect SharpHound Behavior
 
@@ -418,18 +245,16 @@ Look for multiple LDAP filters associated with:
 
 •	SPNs
 
+Correlating multiple enumeration-related LDAP filters from the same process may help identify broader Active Directory reconnaissance activity.
+
 ## MITRE ATT&CK Mapping
 
 | Tactic | Technique | ATT&CK ID | Investigation Relevance |
 |--------|-----------|-----------|-------------------------|
 | Discovery | Account Discovery | T1087 | Enumerating user accounts through LDAP queries |
 | Discovery | Domain Account Discovery | T1087.002 | Identifying domain user accounts |
-| Discovery | Permission Groups Discovery | T1069 | Discovering security and permission groups |
-| Discovery | Domain Groups | T1069.002 | Enumerating Active Directory group memberships |
-| Discovery | Remote System Discovery | T1018 | Discovering systems within the domain environment |
-| Discovery | Domain Trust Discovery | T1482 | Identifying trust relationships between Active Directory domains |
 
-The observed LDAP user enumeration most directly supports T1087.002. The remaining techniques provide broader reconnaissance context and should not be treated as confirmed findings unless supported by additional telemetry.
+The observed LDAP user enumeration most directly supports MITRE ATT&CK technique T1087.002 (Domain Account Discovery). The mapping is limited to account discovery because the documented LDAP search filter directly supports user enumeration. Other Active Directory discovery techniques would require additional supporting telemetry.
 
 ## Key Findings
 
@@ -442,12 +267,14 @@ The observed LDAP user enumeration most directly supports T1087.002. The remaini
 | Suspicious Process | `rundll32.exe` represented the most unusual process observed during the investigation. |
 | Detection Value | LDAP search filters provide valuable behavioral indicators for detecting Active Directory reconnaissance. |
 
+**Investigation Limitation**: The available results identify matching LDAP search activity and originating process names but do not provide sufficient execution context to conclusively attribute the activity to an attacker.
+
 ## Conclusion
 
 This investigation demonstrated how LDAP telemetry can be used to detect Active Directory reconnaissance activity.
 
 By focusing on LDAP search filters rather than only process creation events, analysts can identify domain enumeration activity generated by tools such as SharpHound, Rubeus, PowerShell, MMC, and suspicious LOLBINs such as rundll32.
 
-The key lesson is that Active Directory reconnaissance often leaves clear LDAP search patterns. When those patterns are associated with unusual processes, they become valuable detection leads for SOC analysts and threat hunters.
-
 The findings highlight the importance of correlating LDAP telemetry with endpoint process information to distinguish legitimate directory queries from potentially malicious reconnaissance. In this lab investigation, rundll32.exe was identified as a priority for further analysis, rather than a confirmed indicator of compromise.
+
+This exercise strengthened practical skills in Splunk SPL querying, LDAP telemetry analysis, suspicious process identification, and MITRE ATT&CK mapping, while highlighting the importance of evidence-based conclusions in SOC investigations.
