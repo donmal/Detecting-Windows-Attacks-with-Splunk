@@ -2,23 +2,39 @@
 
 ## Executive Summary 
 
-This investigation focused on detecting Active Directory replication abuse using Splunk by analyzing Windows Security Events associated with directory replication operations and computer account modifications. The investigation examined both DCSync and DCShadow techniques by correlating replication permissions, directory replication requests, and Service Principal Name (SPN) modifications to identify behavior consistent with unauthorized Active Directory replication.
+This investigation examined potential Active Directory replication abuse using Splunk by analyzing Windows Security Events associated with directory service access and computer account modifications.
+
+The analysis focused on two techniques: DCSync, which abuses directory replication capabilities to obtain credential material, and DCShadow, which can use rogue Domain Controller registration to introduce unauthorized directory changes.
+
+Event ID 4662 analysis identified the account **RAUL_LYNN** associated with replication-related permissions on **DC=corp,DC=local**. Event ID 4742 analysis identified a Global Catalog Service Principal Name (SPN), **GC/YELLOW.evil.local/evil.local**, relevant to the investigation of potential rogue Domain Controller registration.
+
+These findings provide indicators for further investigation but do not independently confirm successful credential extraction or unauthorized directory replication.
 
 ## Investigation Objectives 
 
 - Understand the differences between DCSync and DCShadow attacks.
-- Detect unauthorized Active Directory replication activity.
+  
+- Investigate indicators of potentially unauthorized Active Directory replication activity.
+  
 - Identify accounts performing replication requests.
+  
 - Detect rogue Domain Controller registration attempts.
+  
 - Analyze replication-related Windows Security Events.
+  
 - Correlate replication artifacts with Active Directory object modifications.
+  
 - Map observed behavior to MITRE ATT&CK.
 
 ## Background 
 
 ### What is DCSync? 
 
-DCSync is a credential access technique in which an attacker abuses the Active Directory Directory Replication Service (DRS) to request password data directly from a Domain Controller. Instead of accessing the NTDS.dit database, the attacker impersonates a legitimate replication partner and requests credential information through the normal replication protocol. Successful DCSync attacks commonly result in the extraction of privileged account hashes, including the KRBTGT account, enabling subsequent attacks such as Golden Ticket forgery.
+DCSync is a credential access technique in which an attacker abuses the Active Directory Directory Replication Service (DRS) to request password data directly from a Domain Controller. 
+
+Rather than directly copying the **NTDS.dit** database, an attacker with sufficient replication permissions can request directory data through legitimate Active Directory replication interfaces.
+
+Successful DCSync attacks commonly result in the extraction of privileged account hashes, including the KRBTGT account, enabling subsequent attacks such as Golden Ticket forgery.
 
 ### What is DCShadow?
 
@@ -36,23 +52,7 @@ DCShadow is a defense evasion and persistence technique in which an attacker reg
 | Typical Outcome | KRBTGT hash extraction | Unauthorized directory replication |
 | ATT&CK Technique | T1003.006 | T1207 |
 
-## Attack Flow 
-
-### DCSync Attack Flow 
-
-1. Obtain Active Directory replication privileges.
-2. Send DRSGetNCChanges replication requests.
-3. Request password attributes from the Domain Controller.
-4. Extract privileged account hashes (e.g., KRBTGT).
-5. Use stolen credentials for persistence or Kerberos ticket forgery.
-
-### DCShadow Attack Flow 
-
-1. Register a rogue Domain Controller.
-2. Create or modify the nTDSDSA object.
-3. Register Global Catalog Service Principal Names (SPNs).
-4. Push unauthorized Active Directory changes through replication.
-5. Remove traces of the rogue Domain Controller.
+**Detection note**: Event ID 4662 is useful for identifying directory service access involving replication rights, while Event ID 4742 records computer account changes. Neither event alone proves that DCSync or DCShadow succeeded.
 
 ## MITRE ATT&CK Mapping (Background) 
 
@@ -68,71 +68,45 @@ DCShadow is a defense evasion and persistence technique in which an attacker reg
 |---------|----------|
 | Windows Security Logs | Active Directory replication events |
 | Splunk Index (main) | Centralized event analysis |
-| Event ID 4662 | Directory replication permissions |
+| Event ID 4662 | Directory service object access, including replication-related rights |
 | Event ID 4742 | Computer account modifications |
 | Active Directory Objects | Replication targets |
 | Service Principal Names (SPNs) | Rogue Domain Controller detection |
 
 ## Investigation Scope 
 
-The investigation focused on identifying unauthorized Active Directory replication activity by correlating replication permissions, directory replication requests, computer account modifications, and Service Principal Name (SPN) registrations. While both DCSync and DCShadow techniques were examined, the practical investigation primarily focused on identifying artifacts associated with rogue Domain Controller registration.
+The investigation focused on identifying Windows Security events associated with potential Active Directory replication abuse. Analysis included Event ID 4662 records referencing replication-related permissions and Event ID 4742 records containing Global Catalog SPN information.
+
+The objective was to identify relevant accounts, directory objects, and computer account changes that could support further investigation of DCSync or DCShadow activity.
 
 ## Investigation Methodology 
 
 The investigation followed a structured correlation process:
 
 1. Review Active Directory replication events.
+   
 2. Identify replication permissions associated with Event ID 4662.
+   
 3. Review computer account modifications.
+   
 4. Identify suspicious Service Principal Name registrations.
+   
 5. Correlate replication-related artifacts.
+   
 6. Determine whether the observed behavior is consistent with DCSync or DCShadow activity.
 
-## Challenge Context
-
-The investigation was initiated after the security team identified suspicious Active Directory replication activity potentially associated with credential theft or unauthorized directory replication. Analysts were tasked with determining whether an attacker had abused replication permissions to extract credentials or had attempted to register a rogue Domain Controller to replicate unauthorized changes throughout the domain.
-
-Using Splunk, the investigation focused on correlating Windows Security Events, replication permissions, Service Principal Name modifications, and Active Directory object changes to identify indicators of DCSync and DCShadow abuse.
-
-## Investigation Exercise 
-
-### Objective
-
-During an investigation into suspicious Active Directory replication activity, analysts identified modifications to computer objects potentially associated with rogue Domain Controller registration.
-
-Using the provided Splunk data, determine the Service Principal Name (SPN) prefix associated with the suspicious activity.
-
-### Question
-
-Modify the final Splunk search by replacing the missing characters (XX) so that the returned results match the expected output.
-
-### Solution
-
-`GC`
-
-## Investigation Overview 
-
-Before examining individual events, the investigation followed a hypothesis-driven approach. Rather than relying on isolated Windows Security Events, replication permissions, directory replication activity, and Service Principal Name modifications were correlated to reconstruct the complete attack sequence.
-
-The overall investigation focused on determining:
-
-- whether unauthorized replication requests occurred,
-- whether replication permissions were abused,
-- whether computer account modifications indicated rogue Domain Controller registration,
-- whether the observed behavior was consistent with DCSync or DCShadow.
-
-## Key Detection Artifact
+## Global Catalog SPN Investigation Artifact
 
 | Artifact | Value | Investigation Relevance |
 |----------|-------|-------------------------|
-| Global Catalog SPN | `GC/<hostname>/<domain>` | Registration of unauthorized Global Catalog SPNs is a strong indicator of DCShadow activity. |
-| Example | `GC/YELLOW.evil.local/evil.local` | Example extracted during the investigation. |
+| Global Catalog SPN | `GC/<hostname>/<domain>` | Unexpected Global Catalog SPN changes can indicate potentially unauthorized Domain Controller registration activity. |
+| Observed SPN | `GC/YELLOW.evil.local/evil.local` | Global Catalog SPN identified in the recorded Event ID 4742 investigaiton results. |
 
-## Investigation Query #1
+## DCSync - Replication Permission Analysis
 
 ### Purpose:
 
-Identify Active Directory replication requests indicative of DCSync activity by searching for Event ID 4662 records containing replication-related permissions.
+Identify directory service access events involving replication-related permissions that may warrant investigation for potential DCSync activity.
 
 ### Detecting DCSync:
 
@@ -141,6 +115,9 @@ index=main earliest=1690544278 latest=1690544280 EventCode=4662 Message="*Replic
 | rex field=Message "(?P<property>Replicating Directory Changes.*)"
 | table _time, user, object_file_name, Object_Server, property
 ```
+**Technical note**: The query filters Event ID 4662 records for replication-related text and extracts a **property** field. This provides evidence of directory service access involving replication permissions, but the query does not independently demonstrate that a DRS replication request retrieved credential material.
+
+The **rex** expression uses the named capture syntax **(?P<property>...)**, which is supported by PCRE-style regular expressions. The query should be tested against the original event format to ensure the extracted value is populated as intended.
 
 ### Results 
 
@@ -153,9 +130,13 @@ index=main earliest=1690544278 latest=1690544280 EventCode=4662 Message="*Replic
 
 ### Query Analysis: 
 
-The query searches Windows Security Event ID 4662 for replication permissions associated with the Directory Replication Service. Requests containing the "Replicating Directory Changes" property frequently indicate DCSync activity because attackers must possess replication privileges to request password data from Domain Controllers.
+The query searches Windows Security Event ID 4662 for directory service access involving the **Replicating Directory Changes** permission.
 
-## Investigation Query #2
+The recorded results identified account **RAUL_LYNN** in connection with replication-related permissions, including **Replicating Directory Changes All**, on the directory object **DC=corp,DC=local**.
+
+These findings are relevant to DCSync threat hunting because the technique relies on Active Directory replication rights. However, legitimate replication activity and authorized administrative operations may produce related events, so the account's permissions and activity should be validated before attributing the behavior to DCSync.
+
+## DCShadow - Global Catalog SPN Investigation
 
 ### Purpose: 
 
@@ -177,38 +158,17 @@ index=main earliest=1690623888 latest=1690623890 EventCode=4742
 | Global Catalog SPN | `GC/YELLOW.evil.local/evil.local` |
 | Indicator | `GC/` |
 
-GC/YELLOW.evil.local/evil.local
+The query analyzes Windows Security Event ID 4742 for computer account modification events containing a Global Catalog SPN matching the **GC/** prefix.
 
-### Query Analysis:
-
-The query analyzes Event ID 4742 to identify modifications to computer accounts containing Global Catalog Service Principal Names (SPNs). Unexpected registration of the GC/ prefix is a strong indicator of DCShadow because attackers commonly register rogue Domain Controllers before replicating unauthorized directory changes.
-
-## Investigation Workflow
-
-### DCSync Investigation Workflow 
-
-1. Review Windows Security Event ID 4662.
-2. Identify entries containing the replication permission:
-   `Replicating Directory Changes`
-3. Verify the account requesting replication privileges.
-   **User:** `RAUL_LYNN`
-4. Confirm the replicated directory object.
-   **Object:** `DC=corp,DC=local`
-5. Assess whether the observed replication activity is consistent with DCSync.
-
-### DCSync Investigation Workflow 
-
-1. Review Windows Security Event ID 4742 for computer account modifications.
-2. Analyze Service Principal Name (SPN) changes.
-3. Identify Global Catalog SPN registrations containing the `GC/` prefix.
-4. Verify the modified computer account.
-5. Determine whether the observed behavior is consistent with rogue Domain Controller registration.
+The recorded results identified **GC/YELLOW.evil.local/evil.local**, which is relevant to investigations of potential rogue Domain Controller registration. Unexpected SPN modifications can be associated with DCShadow preparation, although the event alone does not establish that a rogue Domain Controller successfully replicated directory changes.
 
 ## Detection Logic
 
 ### Replication Permission Monitoring 
 
-Windows Security Event ID 4662 should be monitored for replication-related permissions such as **Replicating Directory Changes**. These permissions are commonly requested during DCSync attacks because they allow an account to perform directory replication operations normally reserved for Domain Controllers.
+Monitor Windows Security Event ID 4662 for directory service access involving replication-related rights, particularly when the requesting account is not an expected Domain Controller or authorized replication principal.
+
+Relevant replication permissions include **Replicating Directory Changes** and **Replicating Directory Changes All**. Their presence should be evaluated alongside the account identity, directory object, and surrounding activity.
 
 ### Replication GUID Monitoring 
 
@@ -216,7 +176,9 @@ The Active Directory replication GUID:
 
 `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}`
 
-corresponds to the **DS-Replication-Get-Changes** permission. Monitoring this GUID provides additional context when investigating replication-related activity and helps distinguish legitimate replication from potential DCSync abuse.
+corresponds to the **DS-Replication-Get-Changes** permission. 
+
+Monitoring this GUID can help identify directory service access involving replication rights. However, the GUID alone does not distinguish authorized replication from DCSync abuse.
 
 ### Computer Account Modification Monitoring 
 
@@ -224,7 +186,9 @@ Windows Security Event ID 4742 records modifications to computer accounts. Unexp
 
 ### Global Catalog SPN Monitoring 
 
-Unexpected registration of the `GC/` Service Principal Name prefix should be investigated immediately. Global Catalog SPNs are normally assigned only to legitimate Domain Controllers and may indicate DCShadow attempts when observed on unauthorized systems.
+Unexpected registration of the `GC/` Service Principal Name prefix should be investigated immediately.
+
+Global Catalog SPNs are associated with Domain Controller services. Unexpected changes involving these SPNs, particularly on unauthorized computer accounts, can provide a useful indicator of potential DCShadow activity.
 
 ## MITRE ATT&CK Mapping
 
@@ -232,9 +196,12 @@ Unexpected registration of the `GC/` Service Principal Name prefix should be inv
 |--------|-----------|-----------|-------------------------|
 | Credential Access | DCSync | T1003.006 | Active Directory replication abuse for credential extraction |
 | Defense Evasion | DCShadow | T1207 | Rogue Domain Controller registration and unauthorized replication |
-| Persistence | Account Manipulation | T1098 | Modification of Active Directory objects for long-term persistence |
 
-## IOC Summary 
+**Mapping note**: T1003.006 and T1207 represent the primary techniques investigated. The documented telemetry supports replication-related access and suspicious SPN analysis but does not independently confirm successful DCSync credential extraction or DCShadow directory replication.
+
+T1098 (Account Manipulation) should not be presented as an observed technique without evidence of an account modification performed for persistence or privilege escalation.
+
+## Investigation Artifacts and Detection References
 
 | IOC Type | Value |
 |-----------|-------|
@@ -244,31 +211,20 @@ Unexpected registration of the `GC/` Service Principal Name prefix should be inv
 | SPN Prefix | `GC/` |
 | User | `RAUL_LYNN` |
 | Active Directory Object | `DC=corp,DC=local` |
+| Observed Global Catalog SPN | `GC/YELLOW.evil.local/evil.local` |
 
-## Placeholder Screenshots
-
-### Screenshot-01-DCSync-Mimikatz.png
-
-### Screenshot-02-Event4662-ReplicationChanges.png
-
-### Screenshot-03-Splunk-DCSync-Detection.png
-
-### Screenshot-04-DCShadow-Registration.png
-
-### Screenshot-05-DCShadow-Push.png
-
-### Screenshot-06-Splunk-DCShadow-Detection.png
+The event IDs, permission names, account, directory object, and SPN are investigation artifacts rather than confirmed Indicators of Compromise. Their significance depends on the surrounding Active Directory configuration and authentication context.
 
 ## Lessons Learned 
 
 | Lesson | Description |
 |---------|-------------|
 | Active Directory Replication | DCSync abuses legitimate Active Directory replication rather than accessing NTDS.dit directly. |
-| Event ID 4662 | Replication-related permissions provide one of the strongest indicators of DCSync activity. |
+| Event ID 4662 | Replication-related permissions provide useful investigation indicators when correlated with account identity and expected replication behaviour. |
 | Replication GUIDs | Monitoring replication GUIDs provides additional investigative context beyond Event IDs alone. |
 | Computer Account Monitoring | Event ID 4742 helps identify suspicious computer account modifications associated with DCShadow. |
 | Service Principal Names | Unexpected registration of the `GC/` SPN prefix is a valuable indicator of rogue Domain Controller activity. |
-| Attack Progression | DCSync frequently precedes Golden Ticket attacks through KRBTGT hash extraction. |
-| Event Correlation | Correlating replication events, SPN modifications, and Kerberos activity significantly improves detection accuracy. |
-| Active Directory Visibility | Combining Windows Security Events with replication telemetry provides a comprehensive view of Active Directory compromise. |
+| Attack Progression | Successful DCSync activity can enable subsequent credential abuse, including Golden Ticket forgery if the KRBTGT secret is compromised. |
+| Event Correlation | Correlating replication events, SPN modifications, and Kerberos activity can improve investigative context and detection confidence. |
+| Active Directory Visibility | Combining Windows Security Events with replication telemetry provides additional visibility into potential Active Directory replication abuse. |
 
