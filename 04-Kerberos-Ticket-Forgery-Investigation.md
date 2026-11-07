@@ -186,7 +186,7 @@ index=main "Barbi" "SQLSERVER"
 
 ### Figure 9 - Authentication Event Correlation 
 
-![Silver Ticket Authentication Events](../images/kerberos-ticket-forgery-investigation/silver-ticket-authentication-events.jpeg)
+![Silver Ticket Authentication Events](https://github.com/donmal/Detecting-Windows-Attacks-with-Splunk/blob/main/images/kerberos-ticket-forgery-investigation/silver-ticket-authentication-events.jpeg?raw=true)
 
 ### Query Analysis:
 
@@ -218,7 +218,7 @@ Open the Event ID 4648 (Logon Attempt Using Explicit Credentials) record identif
 
 ### Figure 10 - Event ID 4648 Target Service Investigation 
 
-![Silver Ticket CIFS Service Investigation](../images/kerberos-ticket-forgery-investigation/silver-ticket-cifs-service-investigation.jpeg)
+![Silver Ticket CIFS Service Investigation](https://github.com/donmal/Detecting-Windows-Attacks-with-Splunk/blob/main/images/kerberos-ticket-forgery-investigation/silver-ticket-cifs-service-investigation.jpeg?raw=true)
 
 ### Query Analysis:
 
