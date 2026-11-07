@@ -93,6 +93,10 @@ index=main source="WinEventLog:SilkService-Log"
 
 The search identified LDAP activity containing the SPN enumeration filter and associated it with PID 7136. This process identifier was subsequently used to investigate the originating execution context.
 
+### Figure 3 - LDAP SPN Enumeration Analysis 
+
+![LDAP SPN Enumeration](images/kerberoasting-asrep-roasting/ldap-spn-enumeration.jpeg)
+
 ## Sysmon Process Correlation and User Attribution
 
 ### Purpose: 
@@ -114,7 +118,11 @@ index=main 7136 EventCode=1
 
 The Sysmon search returned **CORP\LANDON_HINES** as the user associated with the matching process creation telemetry. This provided an attribution lead connecting the LDAP reconnaissance activity to a domain user account.
 
-**Correlation limitation**: The documented Sysmon query searches for the value 7136 across Event ID 1 records but does not explicitly match the ProcessId field or correlate the process creation timestamp with the LDAP event. Additional validation would strengthen confidence in the attribution.
+**Correlation limitation**: The documented Sysmon query searches for the value 7136 across Event ID 1 records but does not explicitly match the ProcessId field or correlate the process creation timestamp with the LDAP event. Additional validation would strengthen confidence in the attribution. 
+
+### Figure 4 - Sysmon Process Correlation 
+
+![Sysmon PID User Correlation](images/kerberoasting-asrep-roasting/sysmon-pid-user-correlation.jpeg)
 
 ## Investigation Findings
 
