@@ -102,7 +102,7 @@ index=main source="WinEventLog:SilkService-Log"
 ``` 
 ### Figure 1 - LDAP User Enumeration 
 
-![LDAP User Enumeration](images/ldap-reconnaissance/ldap-user-enumeration.png)
+![LDAP User Enumeration](images/ldap-reconnaissance/ldap-user-enumeration.jpeg)
 
 ### Query Breakdown
 
@@ -171,7 +171,7 @@ The **N/A** result also indicates that some matching events did not contain an i
 
 ### Figure 2 - LDAP SearchFilter Evidence 
 
-![LDAP SearchFilter Evidence](images/ldap-reconnaissance/ldap-searchfilter-evidence.png)
+![LDAP SearchFilter Evidence](images/ldap-reconnaissance/ldap-searchfilter-evidence.jpeg)
 
 ## Suspicious Process Analysis - rundll32.exe 
 
