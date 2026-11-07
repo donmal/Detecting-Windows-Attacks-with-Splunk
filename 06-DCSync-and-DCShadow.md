@@ -128,6 +128,10 @@ The **rex** expression uses the named capture syntax **(?P<property>...)**, whic
 | Additional Permission | `Replicating Directory Changes All` |
 | Object | `DC=corp,DC=local` |
 
+### Figure 13 - DCShadow Global Catalog SPN Investigation 
+
+![DCShadow Global Catalog SPN Investigation](../images/dcsync-and-dcshadow/dcshadow-global-catalog-spn.jpeg)
+
 ### Query Analysis: 
 
 The query searches Windows Security Event ID 4662 for directory service access involving the **Replicating Directory Changes** permission.
