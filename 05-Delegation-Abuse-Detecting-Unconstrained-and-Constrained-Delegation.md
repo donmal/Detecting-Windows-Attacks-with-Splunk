@@ -136,7 +136,7 @@ Message="*userAccountControl:1.2.840.113556.1.4.803:=524288*"
 
 ### Figure 11 - Unconstrained Delegation Discovery 
 
-![Unconstrained Delegation PowerShell Analysis](../images/delegation-abuse-detecting-unconstrained-and-constrained-delegation/unconstrained-delegation-powershell.png)
+![Unconstrained Delegation PowerShell Analysis](https://github.com/donmal/Detecting-Windows-Attacks-with-Splunk/blob/main/images/delegation-abuse-detecting-unconstrained-and-constrained-delegation/unconstrained-delegation-powershell.png?raw=true)
 
 ### Query Analysis: 
 
@@ -214,7 +214,7 @@ source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
 
 ### Figure 12 - Kerberos Network Activity and Rubeus Investigation
 
-![Kerberos Network Activity](../images/delegation-abuse-detecting-unconstrained-and-constrained-delegation/kerberos-network-activity.png)
+![Kerberos Network Activity](https://github.com/donmal/Detecting-Windows-Attacks-with-Splunk/blob/main/images/delegation-abuse-detecting-unconstrained-and-constrained-delegation/kerberos-network-activity.png?raw=true)
 
 ### Query Analysis: 
 
