@@ -95,7 +95,7 @@ The search identified LDAP activity containing the SPN enumeration filter and as
 
 ### Figure 3 - LDAP SPN Enumeration Analysis 
 
-![LDAP SPN Enumeration](images/kerberoasting-asrep-roasting/ldap-spn-enumeration.jpeg)
+![LDAP SPN Enumeration](images/kerberoasting-and-asreproasting/ldap-spn-enumeration.jpeg)
 
 ## Sysmon Process Correlation and User Attribution
 
@@ -122,7 +122,7 @@ The Sysmon search returned **CORP\LANDON_HINES** as the user associated with the
 
 ### Figure 4 - Sysmon Process Correlation 
 
-![Sysmon PID User Correlation](images/kerberoasting-asrep-roasting/sysmon-pid-user-correlation.jpeg)
+![Sysmon PID User Correlation](images/kerberoasting-and-asreproasting/sysmon-pid-user-correlation.jpeg)
 
 ## Investigation Findings
 
