@@ -1,8 +1,11 @@
 # 02 - Detecting Pass-the-Ticket 
+Write-up of Hack The Box Academy labs. Practice work.
 
 ## Executive Summary
 
-This investigation focused on detecting Pass-the-Ticket (PtT) activity in Splunk by analyzing Kerberos authentication events and transaction-based event correlation. The investigation identified incomplete Kerberos authentication sequences that may indicate stolen Kerberos ticket reuse and credential abuse.
+This investigation analyzed Kerberos authentication events using Splunk to identify incomplete authentication sequences potentially associated with Pass-the-Ticket (PtT) activity. The analysis focused on correlating Windows Security Event IDs 4768, 4769, and 4770 through transaction-based SPL searches.
+
+The investigation identified **Administrator** and **YOUNG_WILKINSON** in the transaction analysis results, with **YOUNG_WILKINSON** highlighted in the recorded findings. These results provided leads for further investigation into possible Kerberos ticket reuse, although the available telemetry did not independently confirm stolen ticket injection.
 
 ## Investigation Objectives
 
@@ -22,38 +25,9 @@ Pass-the-Ticket (PtT) is a credential abuse technique in which an attacker steal
 Rather than possessing valid credentials, the attacker authenticates using a previously obtained:
 
 - Ticket Granting Ticket (TGT)
-- Ticket Granting Service Ticket (TGS)
+- Service Ticket TGS)
 
-This technique enables unauthorized authentication to remote services while bypassing normal credential validation.
-
-### Attack Objectives
-
-Pass-the-Ticket is commonly used to achieve:
-
-- Lateral Movement
-- Privilege Escalation
-- Domain Persistence
-- Access to internal services
-- Active Directory abuse
-
-## Common Tools
-
-### Mimikatz
-
-Typical commands:
-
-``` text
-kerberos::list
-kerberos::ptt ticket.kirbi
-``` 
-
-### Rubeus
-
-Typical command:
-
-```text
-Rubeus.exe ptt /ticket:ticket.kirbi
-``` 
+The technique allows an attacker to reuse existing Kerberos authentication material without knowing the account's plaintext password.
 
 ## Kerberos Authentication Flow
 
@@ -65,15 +39,17 @@ Rubeus.exe ptt /ticket:ticket.kirbi
 | 4 | Domain Controller issues the TGS | — |
 | 5 | Client authenticates to the target service | Event ID 4624 |
 
-## How Pass-the-Ticket Differs 
+This table represents a simplified Kerberos authentication workflow. Existing cached tickets may be reused without generating a new Event ID 4768 for every service ticket request.
 
-Under normal Kerberos authentication, a client first requests a Ticket Granting Ticket (TGT), generating Security Event ID 4768. The TGT is then used to request a Service Ticket (Event ID 4769), followed by successful authentication to the target service (Event ID 4624).
+## Pass-the-Ticket Detection Context 
 
-During a Pass-the-Ticket attack, the attacker imports an existing Kerberos ticket instead of requesting a new TGT. As a result, Event ID 4769 and subsequent authentication events may occur without a corresponding Event ID 4768. This missing TGT request represents one of the primary behavioral indicators used to detect Pass-the-Ticket activity.
+Pass-the-Ticket may involve importing an existing Kerberos ticket rather than requesting new authentication material. Consequently, some ticket reuse scenarios may generate service ticket activity without a corresponding TGT request within the observed time window.
 
-## Detection Artifact 
+However, legitimate Kerberos ticket caching and long-lived authentication sessions can produce similar patterns. Missing Event ID 4768 records should therefore be treated as investigation leads rather than conclusive evidence of ticket theft.
 
-One of the strongest indicators of Pass-the-Ticket activity is a Kerberos Service Ticket request (Event ID 4769) occurring without a preceding Ticket Granting Ticket request (Event ID 4768) from the same host. Missing TGT requests often indicate imported Kerberos tickets rather than legitimate authentication.
+## Primary Detection Indicator 
+
+The primary detection hypothesis examined in this investigation was the presence of Kerberos service ticket activity without an associated TGT request within the available observation window. This pattern can support Pass-the-Ticket threat hunting when correlated with user identity, source IP address, service information, and additional endpoint evidence.
 
 ## MITRE ATT&CK Mapping (Background) 
 
@@ -95,6 +71,8 @@ One of the strongest indicators of Pass-the-Ticket activity is a Kerberos Servic
 | Event ID 4770 | Ticket renewals |
 | Event ID 4624 | Successful logons |
 
+The documented SPL investigation directly queried Event IDs 4768, 4769, and 4770. Event ID 4624 is relevant for additional authentication correlation but was not included in the supplied investigation query.
+
 ## Investigation Scope
 
 The investigation focused on identifying user accounts exhibiting incomplete Kerberos authentication sequences by correlating Ticket Granting Ticket requests, Service Ticket requests, and ticket renewal events using Splunk transaction analysis.
@@ -104,14 +82,20 @@ The investigation focused on identifying user accounts exhibiting incomplete Ker
 The investigation followed a structured seven-stage correlation process:
 
 1. Collect Kerberos authentication events.
+   
 2. Exclude machine accounts.
+   
 3. Normalize usernames.
+   
 4. Normalize source IPv4 addresses.
+   
 5. Build Kerberos authentication transactions.
+    
 6. Identify incomplete authentication sequences.
+    
 7. Attribute suspicious activity to individual user accounts.
 
-## Investigation Query 
+## Kerberos Transaction Analysis
 
 ### Purpose: 
 
@@ -147,19 +131,23 @@ category
 | Identified Users | Administrator, YOUNG_WILKINSON |
 | Missing Username | YOUNG_WILKINSON |
 
+The recorded results identified **Administrator** and **YOUNG_WILKINSON** as accounts associated with the transaction analysis. The supplied results additionally highlighted **YOUNG_WILKINSON**, although the meaning of the original label "Missing Username" cannot be established from the summary alone.
+
 ### Query Analysis 
 
-The query reconstructs Kerberos authentication activity by collecting Event IDs 4768, 4769 and 4770 while excluding machine accounts. Usernames and IPv4 addresses are normalized before transaction analysis groups related Kerberos events into complete authentication sequences. Transactions missing an initial Ticket Granting Ticket request (`closed_txn=0`) are retained, allowing analysts to identify users whose authentication activity may be consistent with Pass-the-Ticket.
+The SPL search collects Kerberos Event IDs 4768, 4769, and 4770 while filtering out machine accounts. It extracts normalized usernames and IPv4 addresses, then groups related authentication events using Splunk's **transaction** command over a maximum ten-hour window.
+
+The search retains transactions marked as open and returns associated account information. These results provide candidates for further investigation, but additional event-level validation is necessary to establish whether a service ticket request genuinely occurred without an associated TGT request.
 
 ## Detection Logic
 
 ### Missing Ticket Granting Ticket
 
-A Service Ticket request (Event ID 4769) occurring without a preceding Ticket Granting Ticket request (Event ID 4768) is one of the strongest behavioral indicators of Pass-the-Ticket activity.
+Event ID 4769 without an associated Event ID 4768 within the available observation window may indicate ticket reuse, but it can also result from legitimate Kerberos caching or incomplete log coverage.
 
 ### Ticket Renewal Analysis
 
-Event ID 4770 occurring without a corresponding Ticket Granting Ticket request may indicate continued use of an imported Kerberos ticket rather than a newly issued authentication session.
+Event ID 4770 can provide additional context about Kerberos ticket renewal activity. Its presence without a nearby Event ID 4768 is not independently sufficient to identify an imported ticket.
 
 ### Unexpected Kerberos Activity 
 
@@ -173,71 +161,36 @@ Unexpected relationships between these fields may indicate suspicious Kerberos a
 
 ### Authentication Flow Correlation
 
-Legitimate Kerberos authentication normally follows the sequence:
-
-- Event ID 4768
-- Event ID 4769
-- Event ID 4624
-
-Pass-the-Ticket activity frequently deviates from this pattern by generating Event ID 4769 or Event ID 4770 without an associated Event ID 4768, creating an observable gap in the authentication sequence.
-
-## Transaction Analysis
-
-Splunk transactions reconstruct complete Kerberos authentication flows by grouping related events across a configurable time window. This approach enables analysts to identify incomplete authentication sequences, particularly missing Ticket Granting Ticket requests, which represent one of the strongest behavioral indicators of Pass-the-Ticket activity.
+Correlating TGT requests, service ticket requests, and successful authentication events can help analysts investigate unusual Kerberos behavior. The absence of a particular event must be evaluated against ticket lifetime, log availability, and expected authentication patterns.
 
 ## Transaction-Based Detection
 
-Transaction analysis reconstructs complete Kerberos authentication flows by grouping related authentication events over time. This approach enables analysts to identify incomplete authentication sequences that would be difficult to detect by examining individual events in isolation.
+Transaction-based analysis provides a method for grouping Kerberos authentication events by account and source IP address. This approach supports investigation of authentication patterns across multiple event types rather than relying on individual events.
 
-By retaining open transactions (`closed_txn=0`), investigators can efficiently identify missing Ticket Granting Ticket requests, one of the strongest behavioral indicators of Pass-the-Ticket activity.
+For reliable detection, the transaction logic must distinguish between missing TGT requests, incomplete log coverage, and legitimate ticket reuse. The resulting candidates should be validated against individual Kerberos events and available endpoint telemetry.
 
-## IOC Summary
+## Investigation Artifacts and Detection References
 
 | IOC Type | Value |
 |-----------|-------|
-| Event IDs | 4768, 4769, 4770, 4624, 4672 |
 | Authentication Indicators | Missing TGT, Open Transactions, Unexpected Service Tickets |
-| Kerberos Artifacts | TGT, TGS, KRB-CRED, KIRBI |
-| Tools | Mimikatz, Rubeus |
 | Users | Administrator, YOUNG_WILKINSON |
+
+**Analyzed Event IDs**: 4768, 4769, and 4770.
+
+**Detection References**: Event IDs 4624 and 4672 may provide additional authentication and privilege context, but they were not included in the documented search.
+
+The identified user accounts and incomplete transaction patterns represent investigation artifacts rather than confirmed Indicators of Compromise. No direct evidence of Mimikatz execution, Rubeus execution, or stolen Kerberos ticket injection was provided in the documented results.
 
 ## MITRE ATT&CK Mapping
 
 | Tactic | Technique | ATT&CK ID | Investigation Relevance |
 |--------|-----------|-----------|-------------------------|
-| Credential Access | Steal or Forge Kerberos Tickets | T1558 | Theft or reuse of Kerberos authentication material |
-| Credential Access | Pass-the-Ticket | T1550.003 | Authentication using stolen Kerberos tickets |
-| Lateral Movement | Lateral Movement | TA0008 | Movement between systems using valid Kerberos tickets |
-| Defense Evasion | Defense Evasion | TA0005 | Bypassing normal authentication mechanisms |
+| Credential Evasion / Lateral Movement | Pass-the-Ticket | T1550.003 | Authentication using stolen Kerberos tickets |
 
-## Figures
+**Mapping note**: T1550.003 (Pass the Ticket) is the primary technique addressed by the investigation's detection hypothesis. The documented transaction results identify authentication patterns for further analysis but do not independently confirm that stolen Kerberos tickets were used.
 
-### **Figure 1.** Mimikatz ticket extraction.
-Mimikatz Ticket Extraction
-
-### **Figure 2.** Pass-the-Ticket injection using Mimikatz or Rubeus.
-Ticket Injection (PTT)
-
-### **Figure 3.** Kerberos authentication workflow.
-Kerberos Authentication Flow
-
-### **Figure 4.** Security Event ID 4768.
-4768 Event Example
-
-### **Figure 5.** Security Event ID 4769.
-4769 Event Example
-
-### **Figure 6.** Security Event ID 4770.
-4770 Event Example
-
-### **Figure 7.** Splunk transaction query.
-Splunk Detection Query
-
-### **Figure 8.** Transaction analysis results.
-Transaction Results
-
-### **Figure 9.** Investigation output identifying suspicious users.
-Output
+T1558 (Steal or Forge Kerberos Tickets) would require additional evidence of ticket theft, forgery, or related activity. TA0008 and TA0005 are MITRE ATT&CK tactics rather than techniques and therefore do not need separate rows in this table.
 
 ## Detection Engineering Notes
 
@@ -247,18 +200,20 @@ Output
 | Domain Controllers | Domain Controllers generate large volumes of Kerberos authentication events and should be baselined before alerting. |
 | Service Accounts | Service accounts often exhibit authentication patterns that differ from interactive user accounts and require contextual validation. |
 
+**Additional limitation**: The search uses a ten-hour transaction window, which may not capture earlier TGT requests associated with legitimately cached tickets. The resulting transaction status should not be interpreted as definitive proof of malicious ticket reuse.
+
 ## Lessons Learned
 
 | Lesson | Description |
 |---------|-------------|
 | Kerberos Authentication | Pass-the-Ticket abuses Kerberos tickets rather than passwords or NTLM hashes. |
-| Missing TGT Detection | Event ID 4769 without a preceding Event ID 4768 is a strong detection opportunity. |
-| Transaction Analysis | Correlating multiple Kerberos events is significantly more effective than analyzing isolated events. |
-| Tooling | Mimikatz and Rubeus generate similar Kerberos authentication artifacts. |
-| Event Correlation | Correlating usernames, source IP addresses and service names reduces false positives. |
-| Authentication Gaps | Imported Kerberos tickets create observable gaps in the normal authentication sequence. |
-| Threat Hunting | Pass-the-Ticket frequently follows credential dumping or privilege escalation activities. |
+| Missing TGT Detection | Event ID 4769 without a preceding Event ID 4768 is a potential hunting indicator that requires additional validation. |
+| Transaction Analysis | Correlating multiple Kerberos events is more context-rich than analyzing isolated events. |
+| Event Correlation | Correlating usernames, source IP addresses and service names can help improve detection specificity. |
+| Authentication Gaps | Missing Kerberos events may indicate ticket reuse but can also reflect normal ticket caching or incomplete telemetry. |
 
 ## Conclusion
 
-This investigation demonstrated how transaction-based correlation of Kerberos authentication events can be used to identify Pass-the-Ticket activity in Splunk. Detecting missing Ticket Granting Ticket requests, combined with user and network attribution, enables defenders to identify stolen Kerberos ticket reuse while reducing false positives through behavioral analysis.
+This investigation demonstrated a Splunk-based approach for examining Kerberos authentication sequences potentially associated with Pass-the-Ticket activity. Transaction analysis of Windows Security Event IDs 4768, 4769, and 4770 identified **Administrator** and **YOUNG_WILKINSON** as accounts requiring further investigation.
+
+The exercise highlighted the value of correlating authentication events by username and source IP address, while also demonstrating the limitations of identifying ticket reuse solely through missing TGT requests. Additional endpoint evidence and event-level validation would be required to confirm Pass-the-Ticket activity.
