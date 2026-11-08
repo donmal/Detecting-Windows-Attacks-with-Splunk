@@ -1,5 +1,4 @@
 # 06 - DCSync and DCShadow 
-| Hack-the-Box Academy lab write-up | 
 
 ## Executive Summary 
 
