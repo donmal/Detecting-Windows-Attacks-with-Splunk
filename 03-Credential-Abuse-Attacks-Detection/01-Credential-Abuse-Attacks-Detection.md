@@ -1,5 +1,4 @@
 # 01 - Credential Abuse Attacks Detection 
-Write-up of Hack The Box Academy labs. Practice work. 
 
 ## Executive Summary
 
