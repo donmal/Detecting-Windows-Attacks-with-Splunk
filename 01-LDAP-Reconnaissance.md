@@ -1,6 +1,4 @@
 # 01 - LDAP Reconnaissance - Detecting LDAP Reconnaissance with Splunk
-| Hack-the-Box Academy lab write-up | 
-
 
 ## Executive Summary
 
