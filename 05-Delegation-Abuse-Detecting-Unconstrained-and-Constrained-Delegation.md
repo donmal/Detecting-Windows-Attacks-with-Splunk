@@ -1,5 +1,4 @@
 # 05 - Delegation Abuse: Detecting Unconstrained and Constrained Delegation 
-| Hack-the-Box Academy lab write-up | 
 
 ## Executive Summary 
 
