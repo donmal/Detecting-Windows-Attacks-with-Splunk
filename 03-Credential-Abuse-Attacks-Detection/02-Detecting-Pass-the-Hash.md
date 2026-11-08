@@ -1,5 +1,4 @@
 # 02 - Detecting Pass-the-Hash 
-Write-up of Hack The Box Academy labs. Practice work.
 
 ## Executive Summary 
 
