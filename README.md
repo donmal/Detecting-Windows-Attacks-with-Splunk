@@ -1,5 +1,5 @@
 # Detecting Windows Attacks with Splunk - Active Directory Threat Hunting & Detection Portfolio
-Write-up of Hack The Box Academy labs. Practice work.
+Hack-the-Box Academy lab write-up.
 
 ## Overview
 
